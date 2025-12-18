@@ -14,5 +14,8 @@ class ScanRequest(BaseModel):
 
 class ScanResponse(BaseModel):
     final_score: float
+    verdict: str
+    good_ingredients: List[str]
+    bad_ingredients: List[str]
     warnings: List[str]
-    analysis_log: List[str] # for debugging
+    analysis_log: List[str]
