@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pandas
+groq
+pydantic
+python-multipart
+python-dotenv

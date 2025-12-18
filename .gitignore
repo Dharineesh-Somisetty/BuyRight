@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+venv/
+.venv/
+*.env
+
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+android/**/gradle-wrapper.jar
+pubspec.lock
+
+# Mac/Windows
+.DS_Store
+Thumbs.db
