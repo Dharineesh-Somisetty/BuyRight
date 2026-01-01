@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -24,6 +24,21 @@ export const analyzeIngredients = async (ingredients, mode = 'BULK') => {
         return response.data;
     } catch (error) {
         console.error('Error analyzing ingredients:', error);
+        throw error;
+    }
+};
+
+/**
+ * Fetch product details by barcode
+ * @param {string} barcode - Product barcode
+ * @returns {Promise} Product details including ingredients_text
+ */
+export const getProductByBarcode = async (barcode) => {
+    try {
+        const response = await api.get(`/product/${barcode}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching product by barcode:', error);
         throw error;
     }
 };

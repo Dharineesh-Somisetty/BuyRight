@@ -1,36 +1,62 @@
 import pandas as pd
 from typing import List, Dict, Any
 
-# Mock Database
-data = {
-    'name': [
-        'whey protein isolate', 'maltodextrin', 'sugar', 'oats', 
-        'wheat gluten', 'pea protein', 'brown rice flour', 'soy lecithin',
-        'sucralose', 'creatine monohydrate', 'whey protein'
-    ],
-    'type': [
-        'Protein', 'Carb', 'Carb', 'Carb', 
-        'Protein', 'Protein', 'Carb', 'Emulsifier',
-        'Sweetener', 'Supplement', 'Protein'
-    ],
-    'bioavailability': [
-        100, 30, 20, 60, 
-        70, 80, 50, 40,
-        0, 90, 100
-    ],
-    'bloat_risk': [
-        2, 4, 6, 1, 
-        7, 3, 2, 1,
-        4, 1, 2
-    ]
-}
+# ==========================================
+# 1. HEURISTIC RULES (The "Common Sense" Logic)
+# ==========================================
+# Instead of exact matches, we look for these substrings.
+# Priority: High to Low (e.g., check 'whey' before 'protein')
+KEYWORD_RULES = [
+    # --- High Quality Proteins ---
+    {'tag': 'whey',       'type': 'Protein', 'bio': 100, 'bloat': 2},
+    {'tag': 'casein',     'type': 'Protein', 'bio': 90,  'bloat': 2},
+    {'tag': 'egg white',  'type': 'Protein', 'bio': 100, 'bloat': 1},
+    {'tag': 'beef',       'type': 'Protein', 'bio': 90,  'bloat': 0},
+    
+    # --- Medium/Plant Proteins ---
+    {'tag': 'soy',        'type': 'Protein', 'bio': 70,  'bloat': 3},
+    {'tag': 'pea',        'type': 'Protein', 'bio': 75,  'bloat': 4},
+    {'tag': 'hemp',       'type': 'Protein', 'bio': 60,  'bloat': 2},
+    {'tag': 'collagen',   'type': 'Protein', 'bio': 30,  'bloat': 0}, # Low muscle building
+    {'tag': 'gluten',     'type': 'Protein', 'bio': 25,  'bloat': 8}, # Wheat gluten
+    
+    # --- Carbs / Sugars (The "Cut" Killers) ---
+    {'tag': 'sugar',      'type': 'Carb',    'bio': 0,   'bloat': 2},
+    {'tag': 'syrup',      'type': 'Carb',    'bio': 0,   'bloat': 3},
+    {'tag': 'dextrose',   'type': 'Carb',    'bio': 0,   'bloat': 1},
+    {'tag': 'maltodextrin','type':'Carb',    'bio': 0,   'bloat': 4},
+    {'tag': 'oat',        'type': 'Carb',    'bio': 0,   'bloat': 1},
+    {'tag': 'flour',      'type': 'Carb',    'bio': 0,   'bloat': 2},
+    
+    # --- The "Bad" Stuff (Bloat/Inflammation) ---
+    {'tag': 'maltitol',   'type': 'Sweetener', 'bio': 0, 'bloat': 9}, # High penalty
+    {'tag': 'sorbitol',   'type': 'Sweetener', 'bio': 0, 'bloat': 8},
+    {'tag': 'xylitol',    'type': 'Sweetener', 'bio': 0, 'bloat': 7},
+    {'tag': 'palm oil',   'type': 'Fat',       'bio': 0, 'bloat': 2},
+    {'tag': 'vegetable oil','type':'Fat',      'bio': 0, 'bloat': 4},
+    
+    # --- Generic Fallbacks ---
+    {'tag': 'protein',    'type': 'Protein', 'bio': 60,  'bloat': 2}, # Generic protein
+    {'tag': 'gum',        'type': 'Additive','bio': 0,   'bloat': 5}, # Thickeners
+]
 
-df_ingredients = pd.DataFrame(data)
+def analyze_ingredient_heuristic(ingredient_name: str) -> dict:
+    """
+    Scans the ingredient string for keywords to guess its properties.
+    """
+    clean_name = ingredient_name.lower()
+    
+    for rule in KEYWORD_RULES:
+        if rule['tag'] in clean_name:
+            return rule
+            
+    # Default if absolutely nothing matches (e.g., "Water", "Natural Flavors")
+    return {'type': 'Other', 'bio': 0, 'bloat': 0}
 
+# ==========================================
+# 2. THE SCORING ENGINE
+# ==========================================
 def calculate_apex_score(ingredients: List[str], mode: str) -> Dict[str, Any]:
-    """
-    Calculates the Apex Score: starts at 0, adds points for quality, specific penalties.
-    """
     final_score = 0.0
     good_ingredients = []
     bad_ingredients = []
@@ -38,81 +64,112 @@ def calculate_apex_score(ingredients: List[str], mode: str) -> Dict[str, Any]:
     analysis_log = []
     
     current_weight = 1.0
-    decay_factor = 0.9 # Slightly less decay to allow more ingredients to count
+    decay_factor = 0.85 # Higher decay ensures top 3 ingredients dominate the score
     
-    analysis_log.append(f"Starting analysis for {len(ingredients)} ingredients. Mode: {mode}")
+    analysis_log.append(f"🔎 Analyzing {len(ingredients)} ingredients in {mode} mode.")
 
-    for ingredient in ingredients:
+    # 1. Normalize Ingredient List (Handle OFF format quirks)
+    # OFF sometimes sends "en:sugar", so we clean it just in case
+    clean_ingredients = [i.replace("en:", "").replace("-", " ") for i in ingredients]
+
+    for ingredient in clean_ingredients:
         ing_clean = ingredient.lower().strip()
-        analysis_log.append(f"Processing: {ingredient} (Weight: {current_weight:.2f})")
         
-        # Lookup
-        match = df_ingredients[df_ingredients['name'] == ing_clean]
+        # --- LOGIC UPGRADE: HEURISTIC LOOKUP ---
+        # Instead of failing on lookup, we "guess" based on the name
+        data = analyze_ingredient_heuristic(ing_clean)
         
-        if match.empty:
-            analysis_log.append(f"  - Not found. Neutral.")
-            current_weight *= decay_factor
-            continue
-            
-        row = match.iloc[0]
-        ing_type = row['type']
-        bioavailability = row['bioavailability']
-        bloat_risk = row['bloat_risk']
+        ing_type = data['type']
+        bioavailability = data['bio']
+        bloat_risk = data['bloat']
         
         points_gained = 0
         penalty_applied = 0
         
-        # 1. Gain Points: Quality Protein or Supplement
-        if ing_type == 'Protein' or ing_type == 'Supplement':
-            # Base points: Bioavailability scaled by weight
-            # Example: Whey (100) * 1.0 = 100 pts. Oats (60) * 0.8 = 48 pts.
-            # We scale it down slightly so 1 ingredient doesn't instantly max out 100 if we want cumulative
-            # OR we just let it add up. Let's add simple points.
-            # logic: gain = (bioavailability / 2) * weight. 
-            # Whey @ pos 1 = 50 pts.
-            points = (bioavailability / 2) * current_weight
+        # --- SCORING RULES ---
+        
+        # A. Proteins Build Score
+        if ing_type == 'Protein':
+            # Logic: 100 bio * weight 1.0 = 100 pts.
+            # We cap generic "protein" keywords lower so they don't game the system.
+            points = (bioavailability) * current_weight
+            
+            # Cap max points per ingredient to avoid overflow
+            points = min(points, 40) 
+            
             final_score += points
-            points_gained += points
             good_ingredients.append(f"{ingredient} (+{points:.1f})")
-            analysis_log.append(f"  - Quality found. +{points:.1f}")
 
-        # 2. Penalties: Bloat Risk
+        # B. Bloat Penalties (Universal)
         if bloat_risk >= 5:
-            penalty = 10.0
-            # Don't drop below 0 immediately relative to this ingredient? 
-            # Global score checks happen at end, but here we just deduct.
+            penalty = 15.0 # Harsh penalty for bloat
             final_score -= penalty
-            penalty_applied += penalty
-            bad_ingredients.append(f"{ingredient} (High Bloat Risk)")
-            warnings.append(f"Bloat warning: {ingredient}")
-            analysis_log.append(f"  - High bloat risk. -{penalty}")
+            bad_ingredients.append(f"{ingredient} (Bloat Risk)")
+            warnings.append(f"⚠️ High Bloat: {ingredient}")
 
-        # 3. Mode Specific Penalties (CUT)
-        if mode == 'CUT' and ing_type == 'Carb' and bloat_risk > 3:
-            penalty = 15.0 * current_weight
-            final_score -= penalty
-            penalty_applied += penalty
-            bad_ingredients.append(f"{ingredient} (Carb limit in CUT)")
-            analysis_log.append(f"  - CUT mode carb penalty. -{penalty:.1f}")
+        # C. Contextual Penalties (CUT vs BULK)
+        if mode == 'CUT':
+            # In Cut, we hate Sugar and Carbs early in the list
+            if ing_type == 'Carb' or ing_type == 'Sweetener':
+                # Higher penalty if it's the 1st or 2nd ingredient
+                impact_score = 20.0 * current_weight
+                if impact_score > 5:
+                    final_score -= impact_score
+                    bad_ingredients.append(f"{ingredient} (Carb)")
+        
+        elif mode == 'BULK':
+            # In Bulk, we actually LIKE safe carbs (Oats/Rice)
+            if ing_type == 'Carb' and bloat_risk < 3:
+                bonus = 5.0 * current_weight
+                final_score += bonus
+                good_ingredients.append(f"{ingredient} (Fuel)")
 
+        # D. The "Trash Filler" Penalty
+        # If the first ingredient is Sugar or Palm Oil, automatic Fail.
+        if current_weight == 1.0 and (ing_type == 'Sweetener' or ing_type == 'Carb') and mode == 'CUT':
+             final_score -= 30
+             warnings.append("❌ Primary ingredient is Sugar/Carb")
+
+        # E. Categorization Catch-All (User Request)
+        # If it's not "Good" and hasn't been flagged "Bad" yet, check if it should be a concern.
+        # We check if the ingredient string (or a substring) is already in the list to avoid dupes, 
+        # but easier to track status flags.
+        
+        is_good = any(ingredient in s for s in good_ingredients)
+        is_bad = any(ingredient in s for s in bad_ingredients)
+        
+        if not is_good and not is_bad:
+            # If it's Fat, Sweetener, Additive, or non-bonus Carb -> Concern
+            if ing_type in ['Fat', 'Sweetener', 'Additive', 'Carb']:
+                # Penalize slightly? Or just list it? 
+                # User said "go to concerns", implying visual. 
+                # Let's deduct tiny points to reflect "Empty" status if we want, 
+                # or just list it. Let's just list it.
+                bad_ingredients.append(f"{ingredient} (Low Quality/Empty)")
+                
+                # Optional: slight penalty for accumulation of trash?
+                final_score -= 1.0 
+        
+        # Decay weight for next item
         current_weight *= decay_factor
 
-    # Final Adjustment / Cap
-    if final_score < 0:
-        final_score = 0.0
-    if final_score > 100:
-        final_score = 100.0
+    # --- FINAL MATH ---
+    # Normalize score. If we found NO protein, the score shouldn't be high.
+    if not good_ingredients and final_score > 0:
+        final_score = final_score * 0.3 # Slash score if it's just "safe" but not "active"
 
-    # Verdict
-    verdict = "Neutral"
+    # Clamp 0-100
+    final_score = max(0.0, min(100.0, final_score))
+
+    # Verdict Generation
     if final_score >= 80:
-        verdict = "Excellent for Bulking"
-    elif final_score >= 50:
-        verdict = "Good Source"
-    elif final_score >= 30:
-        verdict = "Mediocre"
+        verdict = "🏆 Apex Fuel"
+    elif final_score >= 60:
+        verdict = "✅ Solid Choice"
+    elif final_score >= 40:
+        verdict = "⚠️ Mediocre"
     else:
-        verdict = "Avoid if possible"
+        verdict = "❌ Trash"
 
     return {
         "final_score": round(final_score, 1),

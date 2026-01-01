@@ -2,7 +2,49 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { validateImageFile } from '../services/ocr';
 
-const UploadSection = ({ onAnalysisStart }) => {
+const BarcodeSearch = ({ onSearch }) => {
+    const [barcode, setBarcode] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!barcode.trim()) return;
+
+        setIsLoading(true);
+        try {
+            await onSearch(barcode);
+        } catch (error) {
+            // Error managed by parent or here if needed, but parent sets view.
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="glass-strong p-6 mb-8 text-center">
+            <h3 className="text-lg font-semibold mb-4 text-gray-200">Search by Barcode</h3>
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    placeholder="Enter absolute barcode..."
+                    className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors"
+                />
+                <button
+                    type="submit"
+                    disabled={isLoading || !barcode}
+                    className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {isLoading ? '...' : '🔍'}
+                </button>
+            </div>
+        </form>
+    );
+};
+
+const UploadSection = ({ onAnalysisStart, onBarcodeSearch }) => {
     const [selectedImage, setSelectedImage] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [mode, setMode] = useState('BULK');
@@ -56,8 +98,13 @@ const UploadSection = ({ onAnalysisStart }) => {
                     AI-Powered Ingredient Analysis for Smarter Nutrition Choices
                 </p>
                 <p className="text-gray-400 mt-2">
-                    Upload a photo of your supplement's ingredient list and get instant insights
+                    Upload a photo or scan a barcode to get instant insights
                 </p>
+            </div>
+
+            {/* Barcode Search */}
+            <div className="max-w-md mx-auto mb-8 animate-slide-up">
+                <BarcodeSearch onSearch={onBarcodeSearch} />
             </div>
 
             {/* Mode Selector */}
@@ -68,8 +115,8 @@ const UploadSection = ({ onAnalysisStart }) => {
                         <button
                             onClick={() => setMode('BULK')}
                             className={`px-8 py-3 rounded-xl font-semibold transition-all duration-300 ${mode === 'BULK'
-                                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-glow'
-                                    : 'glass hover:bg-white/15 text-gray-300'
+                                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-glow'
+                                : 'glass hover:bg-white/15 text-gray-300'
                                 }`}
                         >
                             💪 BULK
@@ -77,8 +124,8 @@ const UploadSection = ({ onAnalysisStart }) => {
                         <button
                             onClick={() => setMode('CUT')}
                             className={`px-8 py-3 rounded-xl font-semibold transition-all duration-300 ${mode === 'CUT'
-                                    ? 'bg-gradient-to-r from-accent-500 to-accent-600 text-white shadow-glow-accent'
-                                    : 'glass hover:bg-white/15 text-gray-300'
+                                ? 'bg-gradient-to-r from-accent-500 to-accent-600 text-white shadow-glow-accent'
+                                : 'glass hover:bg-white/15 text-gray-300'
                                 }`}
                         >
                             🔥 CUT

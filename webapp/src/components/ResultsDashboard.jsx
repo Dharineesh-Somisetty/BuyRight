@@ -2,7 +2,7 @@ import ScoreGauge from './ScoreGauge';
 import IngredientCard from './IngredientCard';
 import InsightsCharts from './InsightsCharts';
 
-const ResultsDashboard = ({ data, mode, onReset }) => {
+const ResultsDashboard = ({ data, productMetadata, mode, onReset }) => {
     const { final_score, verdict, good_ingredients, bad_ingredients, warnings, analysis_log } = data;
 
     // Determine verdict badge color
@@ -48,9 +48,22 @@ const ResultsDashboard = ({ data, mode, onReset }) => {
         <div className="container mx-auto px-4 py-8 custom-scrollbar max-h-screen overflow-y-auto">
             {/* Header */}
             <div className="text-center mb-8 animate-fade-in">
-                <h1 className="text-4xl font-display font-bold mb-2 gradient-text">
-                    Analysis Complete
-                </h1>
+                {productMetadata ? (
+                    <>
+                        <h1 className="text-4xl font-display font-bold mb-2 gradient-text">
+                            {productMetadata.name || 'Unknown Product'}
+                        </h1>
+                        {productMetadata.brand && (
+                            <p className="text-xl text-gray-300 font-semibold mb-2">
+                                {productMetadata.brand}
+                            </p>
+                        )}
+                    </>
+                ) : (
+                    <h1 className="text-4xl font-display font-bold mb-2 gradient-text">
+                        Analysis Complete
+                    </h1>
+                )}
                 <p className="text-gray-400">
                     Mode: <span className="font-semibold text-white">{mode}</span>
                 </p>

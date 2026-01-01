@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'camera_screen.dart';
+import 'barcode_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,8 +38,54 @@ class ApexScannerApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: cameras.isNotEmpty
-          ? CameraScreen(cameras: cameras)
+          ? HomeScreen(cameras: cameras)
           : const Scaffold(body: Center(child: Text("No cameras found"))),
+    );
+  }
+}
+
+class HomeScreen extends StatefulWidget {
+  final List<CameraDescription> cameras;
+  const HomeScreen({super.key, required this.cameras});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _currentIndex = 0;
+  late List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      CameraScreen(cameras: widget.cameras), // Index 0: Text Scan
+      const BarcodeScreen(), // Index 1: Barcode Scan
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _screens[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        backgroundColor: Colors.black,
+        selectedItemColor: Colors.greenAccent,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.text_fields),
+            label: 'Text Scan',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.qr_code_scanner),
+            label: 'Barcode',
+          ),
+        ],
+      ),
     );
   }
 }

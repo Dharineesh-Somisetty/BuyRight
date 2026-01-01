@@ -37,4 +37,18 @@ class ApiService {
       throw Exception('Error connecting to backend: $e');
     }
   }
+
+  Future<Map<String, dynamic>> fetchProductByBarcode(String barcode) async {
+    final url = Uri.parse('$baseUrl/product/$barcode');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Product not found or error: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching product: $e');
+    }
+  }
 }

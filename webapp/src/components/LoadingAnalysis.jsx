@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { extractTextFromImage } from '../services/ocr';
 import { analyzeIngredients } from '../services/api';
 
-const LoadingAnalysis = ({ imageFile, mode, onComplete, onError }) => {
+const LoadingAnalysis = ({ imageFile, initialText, mode, onComplete, onError }) => {
     const [progress, setProgress] = useState(0);
     const [stage, setStage] = useState('extracting'); // 'extracting' | 'analyzing' | 'complete'
     const [statusMessage, setStatusMessage] = useState('Extracting text from image...');
@@ -10,24 +10,35 @@ const LoadingAnalysis = ({ imageFile, mode, onComplete, onError }) => {
     useEffect(() => {
         const performAnalysis = async () => {
             try {
-                // Stage 1: OCR
-                setStage('extracting');
-                setStatusMessage('Extracting text from image...');
+                let ingredients = [];
 
-                const ingredients = await extractTextFromImage(imageFile, (ocrProgress) => {
-                    setProgress(ocrProgress * 50); // OCR takes 50% of progress
-                });
+                if (initialText) {
+                    // Skip OCR if we have text from barcode
+                    // Split the text into a list of ingredients
+                    ingredients = initialText.split(',').map(i => i.trim()).filter(i => i.length > 0);
+                    setProgress(50);
+                } else {
+                    // Stage 1: OCR
+                    setStage('extracting');
+                    setStatusMessage('Extracting text from image...');
 
-                if (!ingredients || ingredients.length === 0) {
-                    throw new Error('No ingredients found in the image. Please try a clearer photo.');
+                    const extractedText = await extractTextFromImage(imageFile, (ocrProgress) => {
+                        setProgress(ocrProgress * 50); // OCR takes 50% of progress
+                    });
+
+                    if (!extractedText || extractedText.length === 0) {
+                        throw new Error('No ingredients found in the image. Please try a clearer photo.');
+                    }
+                    ingredients = extractedText;
                 }
 
                 // Stage 2: Analysis
                 setStage('analyzing');
-                setStatusMessage(`Analyzing ${ingredients.length} ingredients...`);
+                setStatusMessage(`Analyzing ingredients...`);
                 setProgress(60);
 
                 const result = await analyzeIngredients(ingredients, mode);
+
 
                 setProgress(90);
                 setStatusMessage('Preparing results...');
